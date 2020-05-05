@@ -1,0 +1,25 @@
+probar casper_vv esta en /home/seba/Workspace/ccat/ccat_stable ---> no tiene el movimiento raro del piso de ruido.
+								    falta ver si la fase esta bien calculada y ver el
+							 	    rango dinamico del sistema	
+								
+---------------------------------------------------------------
+Codigo:
+    1.-Modificar un poco el codigo del ppc para poder entregarle una senal
+    de stop en la medicion (actualmente el script solo termina cuando pasan
+    el num de iteraciones seteadas)
+    
+    2.-Data format: esto esta en alguna carpeta del pc de calan. decidimos 
+    seguir la recomendacion de ronan con el tipo de formato.
+
+    3.-Mapa de la medicion: esop. La idea es tomar una pura muestra y linkearlo
+    con la posiciion actual del telescopio.
+    
+    4.-Debbugear los plots en tiempo real.
+
+    5.-Interface con el usuario final.
+
+
+
+
+	
+
