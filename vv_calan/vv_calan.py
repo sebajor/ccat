@@ -4,6 +4,10 @@ import telnetlib
 from plot_snapshot import snapshot
 from powerpc import PPC_upload_code, PPC_start_measure,PPC_download_data, PPC_kill_process
 from parse_raw import parse_raw
+from plots import plot_data
+from get_data import get_spect0, get_spect1, get_phase, init_chann_data, get_chann_data
+
+
 
 
 class vv_calan(object):
@@ -30,6 +34,15 @@ class vv_calan(object):
         self.fpga.upload_program_bof(self.bof, 3000)
         time.sleep(1)
 
+###
+###     VECTOR VOLTMETER INITIALIZATION CODES:
+###             BEFORE ANY TYPE OF MEASUREMENT YOU MUST
+###             INITIALIZE THE SYSTEM AND SET THE 
+###             INTEGRATION TIME.
+###
+###             
+###
+
 
     def set_integ_time(self, integ_time=1.2*10**-3):
         """Set integration time 
@@ -51,7 +64,20 @@ class vv_calan(object):
         self.fpga.write_int('cnt_rst',1)
         self.set_integ_time(integ_time)
         self.fpga.write_int('cnt_rst',0)
-        
+   
+     
+###
+###     IRIG TIMESTAMP INITIALIZATION CODES:
+###             IF YOU WANT TO USE THE TIMESTAMP YOU MUST
+###             INITIALIZE THE SYSTEM AND THEN CALIBRATE
+###             IT USING AS INPUT A IRIG MASTER CLOCK
+###             YOU COULD ACCESS TO CHECK THE ACTUAL TIME,
+###             YOU COULD READ A REGISTER TO CHECK IF
+###             THE TIME DRIFT IS LESS THAN A CERTAIN
+###             THRESHOLD.
+###
+
+
     def init_timestamp(self, unlock_error=10**-4):
         """initialize the timestamp model
             unlock_error = the varition in seconds to rise an
@@ -131,6 +157,8 @@ class vv_calan(object):
                  
             print('Timestamp calibration finished :D')
     
+
+
     
     def get_hour(self):
         """Translate the time from seconds of a year
@@ -154,11 +182,41 @@ class vv_calan(object):
         return out
 
 
+
+
+### 
+###      PLOTS: YOU COULD LOOK AT THE INPUT IN THE ADCS
+###             LOOK THE SPECTRUM, CORRELATION AND RELATIVE
+###             PHASE OF THE INPUTS        
+###
+
     def adc_snapshot(self):
         """Plot animation of the ADC snapshot
         """
         snapshot(self.fpga)
     
+    def create_plot(self):
+        self.plotter = plot_data(self.fpga)
+    
+    def generate_plot(self, plots=['spect0','spect1'],chann=6068, freq=[0,67.5],bw=[0,67.5]):
+        """
+
+        #Carefull using the plots containing chann_values with 
+        the poistion mapping, could mess up the map.
+        """
+        self.plotter.plotter(plots, chann=chann, freq=freq, bw=bw)        
+
+
+###
+###    POWERPC CODES: YOU MUST UPLOAD THE CODES TO THE 
+###                   MICRO WHEN YOU WANT TO MAKE A MEASUREMENT
+###                   THEN YOU COULD INITIALIZE THE MEASURE
+###                   FINALLY YOU COULD KILL THE PROCESS  
+###                   AND DOWNLOAD THE COLLECTED DATA
+###                   WE PROVIDE A FUNCTION TO PARSE THE DATA
+###                   AND GIVE IT IN HDF5 FORMAT
+###
+
 
     def ppc_upload_code(self, file_path='ppc_save'):
         """Upload the required files to the ppc in the ROACH
@@ -173,7 +231,7 @@ class vv_calan(object):
            duration=time of the complete measure, in minutes 
         """
         ###TODO: check if some registers must be cleaned before...
-        self.fpga.write_int('addr2catch', chann)                       #select the channel to save in the ppc
+        self.fpga.write_int('addr2catch', chann) #select the channel to save in the ppc
         bram_addr = 8192.
         bram_period = self.fft_size*bram_addr*self.n_acc/(self.fpga_clk*10**6)*2 #we have two banks
         self.__read_cycles__ = int(duration*60./bram_period)
@@ -193,7 +251,7 @@ class vv_calan(object):
            elapsed
         """
         PPC_kill_process(self.IP, self.__pid__)
-
+    
 
 
     def parse_raw_data(self, filename='raw_data', n_reading=None):
@@ -206,7 +264,13 @@ class vv_calan(object):
         else:
             parse_raw(filename, n_reading)
 
-        
+
+
+###
+###     CALIBTRATION CODES: BEFORE ANY SERIOUS MEASUREMENT YOU
+###                         MUST MAKE CALIBRATION TO THE ADCS
+###                         REFEAR TO THE DOCUMENT ATACHED IN
+###                         THE GITHUB PAGE.
 
     def calibration(self, load=0, man_gen=0, ip_gen='192.168.1.33', filename='cal'):
         """This function makes the calibration of the ROACH more 
@@ -242,8 +306,14 @@ class vv_calan(object):
         print(parameter)    
         os.system(parameter)
 
-
-
+###
+###     CHANGE THE VALON FREQUENCY: TO USE THE CODES YOU MUST CONNECT
+###                                 TO THE BACK OF THE ROACH WITH A 
+###                                 MICRO-USB CONNECTOR.
+###                                 CHECK ALSO WICH TTY IS CREATED
+###                                 CHANGING THIS VALUE AFECT THE FPGA 
+###                                 CLOCK TOO.
+###
     def set_valon_freq(self, new_freq, port=1):
         """
         To use this function is necessary to be connected 
@@ -269,11 +339,15 @@ class vv_calan(object):
             parameter += ' -s A'
             os.system(parameter)
 
-
     def synchronization(self):
         ##TODO...
         return    
 
+
+###
+###     SIMPLE GETTERS AND SETTERS
+###
+###
 
     def get_sampling_freq(self):
         """Returns the sampling frequency at the ADC
@@ -288,7 +362,74 @@ class vv_calan(object):
         return self.fpga_clk
 
 
+    def get_adc0_spect(self):
+        out = get_spect0(self.fpga)
+        return out
+    
+    def get_adc1_spect(self):
+        out = get_spect1(self.fpga)
+        return out
 
+    def get_rel_phase(self):
+        out = get_phase(self.fpga)
+        return out
+    
+    def get_index(self, freq):
+        """given a input frequency returns the
+           nearest dft point.
+           freq: frequency in MHz in the range (0-bw)
+        """
+        freqs = np.linspace(0, self.bw, self.channels, endpoint=False)
+        ind = np.argmin(np.abs(freq-freqs))
+        return ind
+    
+#THE FUNCTIONS DOWN THIS LINE ARE USED IN THE
+#MAP CREATION.. THEY DONT GET ALONG WITH THE
+#OPTION plots=['chan_values'] IN THE generate_plot
+#BECAUSE IT CHANGES THE NUMBER OF POINTS TAKEN.
+#SO TAKE CARE OF THAT
+
+    def init_chann_aqc(self, chann=6068, n_samp=1, continuous=1):
+        """Initialize the one channel acquisition.
+           channel: dft channel you want to look at
+           n_samp: the number of samples that you want to store in bram
+                   support values in the range (1-8192)
+           cont: if you want to acquire continously data in the bram using
+                 a free running  counter or you want to store n_samples
+                 and keep it until you read it.
+                 If you select the second option you must be aware that
+                 is your job reset the counter and enable the storing again
+                 after you read the data.(use the function rst_freeze_cntr
+                 after the read)
+        """
+        init_chann_data(self.fpga, chann=chann, n_samp=n_samp, continouus=continuous)
+    
+
+    def get_chann_data(self, n_samp=1):
+        """Get the data (power in ADC0, ADC1, correlation)
+           of one given channel, before using it you must 
+           have initialize with init_chann_aqc.
+            
+           n_samp: must be the same value used in the
+                   initialization function
+    
+            ###obs: the powers are not in dB...
+    
+        """
+        [adc0,adc1, corr_re, corr_im] = get_chann_data(n_samp)
+        return [adc0, adc1, corr_re, corr_im]
+
+
+
+
+
+
+
+
+
+    def reset_freeze_cntr(self):
+        #TODO
+        return
 
 
 
