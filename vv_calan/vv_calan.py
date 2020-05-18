@@ -6,7 +6,7 @@ from powerpc import PPC_upload_code, PPC_start_measure,PPC_download_data, PPC_ki
 from parse_raw import parse_raw
 from plots import plot_data
 from get_data import get_spect0, get_spect1, get_phase, init_chann_data, get_chann_data
-
+import numpy as np
 
 
 
@@ -402,7 +402,7 @@ class vv_calan(object):
                  after you read the data.(use the function rst_freeze_cntr
                  after the read)
         """
-        init_chann_data(self.fpga, chann=chann, n_samp=n_samp, continouus=continuous)
+        init_chann_data(self.fpga, chann=chann, n_samp=n_samp, continous=continuous)
     
 
     def get_chann_data(self, n_samp=1):
@@ -416,7 +416,7 @@ class vv_calan(object):
             ###obs: the powers are not in dB...
     
         """
-        [adc0,adc1, corr_re, corr_im] = get_chann_data(n_samp)
+        [adc0,adc1, corr_re, corr_im] = get_chann_data(self.fpga, n_samp)
         return [adc0, adc1, corr_re, corr_im]
 
 
