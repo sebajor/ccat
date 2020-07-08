@@ -143,7 +143,26 @@ def PPC_kill_process(roachIP, pid):
         return 
 
 
+def PPC_check_status(roachIP):
+    user = 'root'
+    tn = telnetlib.Telnet(roachIP)
+    tn.read_until("login: ")
+    tn.write(user + "\n")
+    time.sleep(1)
+    tn.read_very_eager()
 
+    for i in range(3):
+        tn.write("ps | grep *ppc_save* \n")
+        time.sleep(1)
+        ans = tn.read_very_eager()
+        print(ans)
+        if(ans.find('ppc_save')!=-1):
+            print('Process running')
+            return 1
+    print('Process not found')
+    return 0
+            
+    
 
 
 

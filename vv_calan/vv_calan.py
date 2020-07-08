@@ -2,12 +2,12 @@ import corr
 import time,os
 import telnetlib
 from plot_snapshot import snapshot
-from powerpc import PPC_upload_code, PPC_start_measure,PPC_download_data, PPC_kill_process
+from powerpc import PPC_upload_code, PPC_start_measure,PPC_download_data, PPC_kill_process, PPC_check_status
 from parse_raw import parse_raw
 from plots import plot_data
 from get_data import get_spect0, get_spect1, get_phase, init_chann_data, get_chann_data
 import numpy as np
-
+import os.path
 
 
 class vv_calan(object):
@@ -18,6 +18,7 @@ class vv_calan(object):
             ##Remember the sampling frequency is the double
             of the valon frequency
         """
+        self.path = os.path.abspath('ppc_save')
         self.IP = roachIP
         self.bof = bof_path
         self.valon_freq = valon_freq
@@ -198,14 +199,16 @@ class vv_calan(object):
     def create_plot(self):
         self.plotter = plot_data(self.fpga)
     
-    def generate_plot(self, plots=['spect0','spect1'],chann=6068, freq=[0,67.5],bw=[0,67.5]):
+    def generate_plot(self, plots=['spect0','spect1'],chann=6068, freq=[0,67.5],manual_bw=0,bw=[0,67.5]):
         """
 
         #Carefull using the plots containing chann_values with 
         the poistion mapping, could mess up the map.
         """
-        self.plotter.plotter(plots, chann=chann, freq=freq, bw=bw)        
-
+        if(manual_bw):
+            self.plotter.plotter(plots, chann=chann, freq=freq, bw=bw)        
+        else:
+            self.plotter.plotter(plots,chann=chann, freq=freq,bw=[0,self.bw])
 
 ###
 ###    POWERPC CODES: YOU MUST UPLOAD THE CODES TO THE 
@@ -238,7 +241,8 @@ class vv_calan(object):
         self.__pid__ = PPC_start_measure(self.IP,self.__read_cycles__)
         print("PID of the process: "+str(self.__pid__))
         
-                
+    def ppc_check_status(self):
+        PPC_check_status(self.IP)        
 
     def ppc_download_data(self, pc_IP):
         """Download the saved data to a computer
@@ -259,6 +263,8 @@ class vv_calan(object):
         Parse the raw data after downloading the data from the 
         PowerPC and save it in hdf5 format.
         """
+        print('This method runs by default using the measurent duration as input to calculate the size of the file')
+        print('If you had killed the process before it finished you could use the number of readings variable to change it.')
         if(n_reading==None):
             parse_raw(filename, self.read_cycles*2)
         else:
@@ -314,6 +320,29 @@ class vv_calan(object):
 ###                                 CHANGING THIS VALUE AFECT THE FPGA 
 ###                                 CLOCK TOO.
 ###
+    def get_valon_status(self, port=1):
+        """Prints the actual configuration of the valon
+        """
+        parameter = "python adc_clock.py"
+        if(port):
+            parameter += ' -s B'
+        else:
+            parameter += ' -s A'
+        os.system(parameter)
+
+    def set_valon_ref(self, ref='i', port=1):
+        parameter = "python adc_clock.py"
+        if(port):
+            parameter += ' -s B'
+        if(not port):
+            parametr += ' -s A'
+        if(ref=='i'):
+            parameter +=' -i'
+        if(ref=='e'):
+            parameter +=' -e'
+        os.system(parameter)
+
+
     def set_valon_freq(self, new_freq, port=1):
         """
         To use this function is necessary to be connected 
@@ -342,7 +371,15 @@ class vv_calan(object):
     def synchronization(self):
         ##TODO...
         return    
-
+   
+    def get_aprox_clk(self):
+        """Gives an estimation measured inside of the FPGA
+            of the fpga clock value. It is not exact as look at the 
+            valon frequency directly.
+        """
+        clk_aprox = self.fpga.est_brd_clk()
+        print(clk_aprox)
+        return clk_aprox
 
 ###
 ###     SIMPLE GETTERS AND SETTERS
@@ -350,7 +387,9 @@ class vv_calan(object):
 ###
 
     def get_sampling_freq(self):
-        """Returns the sampling frequency at the ADC
+        """Returns the sampling frequency at the ADC using the 
+           user provided information. You could use the approx_clk
+           to stimate the current frequency.
         """
         return self.valon_freq*2
 

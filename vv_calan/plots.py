@@ -151,13 +151,13 @@ class plot_data():
         ax2.set_title('ADC0 power')
         ax2.set_ylabel('[dB]')
         ax2.set_xlabel('Samples')
-        ax2.set_ylim(10, 120)
+        ax2.set_ylim(10, 160)
         ax2.set_xlim(0, self.n_points)
         
         ax3.set_title('ADC1 power')
         ax3.set_ylabel('[dB]')
         ax3.set_xlabel('Samples')
-        ax3.set_ylim(10, 120)
+        ax3.set_ylim(10, 160)
         ax3.set_xlim(0, self.n_points)
 
         ax1.grid()
